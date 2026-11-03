@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EV Monitor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#f4f6f8;--card:#fff;--ink:#16202a;--muted:#667085;--line:#e4e7ec;--brand:#12a05c;--brand-d:#0d7a45;--danger:#d92d20;--radius:12px}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:var(--ink);color:#fff;display:flex;align-items:center;gap:24px;padding:0 24px;height:56px}
+  header h1{font-size:18px;margin:0;display:flex;gap:8px;align-items:center}
+  header h1 span{color:#4ade80}
+  nav{display:flex;gap:4px;flex:1}
+  nav button{background:none;border:0;color:#cbd5e1;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:14px}
+  nav button.active,nav button:hover{background:#243241;color:#fff}
+  main{max-width:1000px;margin:24px auto;padding:0 16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:20px}
+  .card h2{margin:0 0 14px;font-size:17px}
+  .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .stat small{color:var(--muted)}
+  .stat b{display:block;font-size:26px;margin-top:4px}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+  input,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff}
+  input:focus,select:focus{outline:2px solid #86efac;border-color:var(--brand)}
+  .form{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end}
+  .btn{background:var(--brand);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer}
+  .btn:hover{background:var(--brand-d)}
+  .btn.ghost{background:none;color:var(--ink);border:1px solid var(--line)}
+  .btn.danger{background:none;color:var(--danger);border:1px solid #fecdca}
+  .btn.sm{padding:5px 10px;font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:500;font-size:13px}
+  td.actions{white-space:nowrap;text-align:right}
+  .empty{color:var(--muted);padding:20px 0;text-align:center}
+  .msg{padding:10px 12px;border-radius:8px;font-size:14px;margin-bottom:14px;display:none}
+  .msg.err{display:block;background:#fef3f2;color:var(--danger)}
+  .msg.ok{display:block;background:#ecfdf3;color:var(--brand-d)}
+  #login{max-width:380px;margin:80px auto}
+  .hidden{display:none!important}
+  .overflow{overflow-x:auto}
+  .cfg{font-size:12px;color:var(--muted);margin-top:10px}
+  .cfg input{width:260px;padding:4px 6px;font-size:12px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="login" class="card">
+  <h2>⚡ EV Monitor — Entrar</h2>
+  <div id="loginMsg" class="msg"></div>
+  <form id="loginForm">
+    <label>Usuário</label><input id="lUser" required autocomplete="username">
+    <div style="height:10px"></div>
+    <label>Senha</label><input id="lPass" type="password" required autocomplete="current-password">
+    <div style="height:16px"></div>
+    <button class="btn" style="width:100%">Entrar</button>
+  </form>
+  <div class="cfg">API: <input id="apiBase" value="http://127.0.0.1:8000"></div>
+</section>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header>
+    <h1>⚡ EV <span>Monitor</span></h1>
+    <nav>
+      <button data-tab="visao" class="active">Visão geral</button>
+      <button data-tab="veiculos">Veículos</button>
+      <button data-tab="lancamentos">Lançamentos</button>
+      <button data-tab="comparador">Comparador</button>
+    </nav>
+    <button class="btn ghost sm" id="logout" style="color:#fff;border-color:#475467">Sair</button>
+  </header>
+
+  <main>
+    <div id="globalMsg" class="msg"></div>
+
+    <!-- Visão geral -->
+    <section id="tab-visao">
+      <div class="grid" style="margin-bottom:20px">
+        <div class="stat"><small>Veículos</small><b id="stVeic">–</b></div>
+        <div class="stat"><small>Lançamentos</small><b id="stLanc">–</b></div>
+        <div class="stat"><small>Total de km rodados</small><b id="stKm">–</b></div>
+        <div class="stat"><small>Mais eficiente</small><b id="stBest" style="font-size:18px">–</b></div>
+      </div>
+      <div class="card"><h2>Eficiência por veículo (km/kWh)</h2><canvas id="chartHome" height="110"></canvas></div>
+    </section>
+
+    <!-- Veículos -->
+    <section id="tab-veiculos" class="hidden">
+      <div class="card">
+        <h2>Cadastrar veículo</h2>
+        <form id="veicForm" class="form">
+          <div><label>Marca</label><input id="vMarca" required></div>
+          <div><label>Modelo</label><input id="vModelo" required></div>
+          <div><label>Ano</label><input id="vAno" type="number" min="2000" max="2100" required></div>
+          <div><label>Bateria (kWh)</label><input id="vCap" type="number" step="0.01" min="0" required></div>
+          <div><button class="btn">Adicionar</button></div>
+        </form>
+      </div>
+      <div class="card overflow">
+        <h2>Meus veículos</h2>
+        <table><thead><tr><th>Marca</th><th>Modelo</th><th>Ano</th><th>Bateria (kWh)</th><th></th></tr></thead><tbody id="veicBody"></tbody></table>
+      </div>
+    </section>
+
+    <!-- Lançamentos (F02) -->
+    <section id="tab-lancamentos" class="hidden">
+      <div class="card">
+        <h2 id="lancTitle">Novo lançamento de uso</h2>
+        <form id="lancForm" class="form">
+          <div><label>Veículo</label><select id="lVeiculo" required></select></div>
+          <div><label>Km rodados</label><input id="lKm" type="number" step="0.1" min="0" required></div>
+          <div><label>Nível da bateria (%)</label><input id="lBat" type="number" step="0.1" min="0" max="100" required></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn" id="lSubmit">Salvar</button>
+            <button type="button" class="btn ghost hidden" id="lCancel">Cancelar</button>
+          </div>
+        </form>
+      </div>
+      <div class="card overflow">
+        <h2>Histórico</h2>
+        <table>
+          <thead><tr><th>Data</th><th>Veículo</th><th>Km</th><th>Bateria %</th><th>km/kWh</th><th></th></tr></thead>
+          <tbody id="lancBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Comparador (F03) -->
+    <section id="tab-comparador" class="hidden">
+      <div class="card"><h2>Comparador de modelos — km/kWh</h2><canvas id="chartComp" height="110"></canvas></div>
+      <div class="card overflow">
+        <table><thead><tr><th>Veículo</th><th>Eficiência (km/kWh)</th></tr></thead><tbody id="compBody"></tbody></table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG — ajuste aqui se os nomes dos campos da sua API forem diferentes
+   ============================================================ */
+const EP = { login:'/api/login/', veiculos:'/api/veiculos/', lancamentos:'/api/lancamentos/', comparador:'/api/comparador/' };
+const F = {
+  veic:{ marca:'marca', modelo:'modelo', ano:'ano', cap:'capacidade_bateria_kwh' },
+  lanc:{ veiculo:'veiculo', km:'quilometragem_rodada', bat:'nivel_bateria_percentual', data:'data_lancamento', efic:'km_por_kwh' },
+  comp:{ efic:'km_por_kwh' }
+};
+
+/* ============================================================ */
+const $ = id => document.getElementById(id);
+let tokens = JSON.parse(localStorage.getItem('ev_tokens') || 'null');
+let veiculos = [], lancs = [], editId = null, charts = {};
+
+const base = () => ($('apiBase').value || '').replace(/\/$/, '');
+const listOf = d => Array.isArray(d) ? d : (d && d.results) || [];
+const num = (v, d=2) => (v==null || isNaN(v)) ? '–' : Number(v).toFixed(d);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function flash(el, text, kind='err'){ el.className = 'msg ' + kind; el.textContent = text; if(kind==='ok') setTimeout(()=>el.className='msg', 3000); }
+
+async function api(path, opts={}){
+  const res = await fetch(base()+path, {
+    ...opts,
+    headers:{ 'Content-Type':'application/json', ...(tokens ? {Authorization:'Bearer '+tokens.access} : {}) }
+  });
+  if(res.status === 401 && tokens){ logout(); throw new Error('Sessão expirada. Entre novamente.'); }
+  if(res.status === 204) return null;
+  const data = await res.json().catch(()=>null);
+  if(!res.ok){
+    const detail = data && (data.detail || Object.entries(data).map(([k,v])=>k+': '+(Array.isArray(v)?v.join(', '):v)).join(' | '));
+    throw new Error(detail || 'Erro '+res.status);
+  }
+  return data;
+}
+
+/* ---------- Auth ---------- */
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  try{
+    const r = await fetch(base()+EP.login, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username:$('lUser').value, password:$('lPass').value }) });
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.detail || 'Usuário ou senha inválidos');
+    tokens = d; localStorage.setItem('ev_tokens', JSON.stringify(d));
+    localStorage.setItem('ev_api', base());
+    start();
+  }catch(err){ flash($('loginMsg'), err.message.includes('fetch') ? 'Não foi possível conectar à API. O backend está rodando?' : err.message); }
+});
+function logout(){ tokens=null; localStorage.removeItem('ev_tokens'); $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
+$('logout').onclick = logout;
+
+/* ---------- Navegação ---------- */
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active', x===b));
+  ['visao','veiculos','lancamentos','comparador'].forEach(t => $('tab-'+t).classList.toggle('hidden', t!==b.dataset.tab));
+  if(b.dataset.tab==='comparador') loadComparador();
+  if(b.dataset.tab==='visao') loadComparador(true);
+});
+
+/* ---------- Carga de dados ---------- */
+async function loadAll(){
+  try{
+    [veiculos, lancs] = await Promise.all([ api(EP.veiculos).then(listOf), api(EP.lancamentos).then(listOf) ]);
+    renderVeiculos(); renderLancs(); renderStats(); loadComparador(true);
+  }catch(err){ flash($('globalMsg'), err.message); }
+}
+const veicNome = id => { const v = veiculos.find(v=>v.id==id); return v ? `${v[F.veic.marca]||''} ${v[F.veic.modelo]||''}`.trim() : '#'+id; };
+
+/* ---------- Veículos ---------- */
+function renderVeiculos(){
+  $('veicBody').innerHTML = veiculos.length ? veiculos.map(v => `
+    <tr><td>${esc(v[F.veic.marca])}</td><td>${esc(v[F.veic.modelo])}</td><td>${esc(v[F.veic.ano])}</td><td>${num(v[F.veic.cap])}</td>
+    <td class="actions"><button class="btn danger sm" onclick="delVeic(${v.id})">Excluir</button></td></tr>`).join('')
+    : '<tr><td colspan="5" class="empty">Nenhum veículo cadastrado.</td></tr>';
+  $('lVeiculo').innerHTML = veiculos.map(v=>`<option value="${v.id}">${esc(veicNome(v.id))} (${esc(v[F.veic.ano])})</option>`).join('');
+}
+$('veicForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  try{
+    await api(EP.veiculos, { method:'POST', body: JSON.stringify({
+      [F.veic.marca]:$('vMarca').value, [F.veic.modelo]:$('vModelo').value, [F.veic.ano]:+$('vAno').value,
+      [F.veic.cap]:$('vCap').value }) });
+    e.target.reset(); flash($('globalMsg'),'Veículo cadastrado.','ok'); loadAll();
+  }catch(err){ flash($('globalMsg'), err.message); }
+});
+async function delVeic(id){
+  if(!confirm('Excluir este veículo e seus lançamentos?')) return;
+  try{ await api(EP.veiculos+id+'/', {method:'DELETE'}); loadAll(); }catch(err){ flash($('globalMsg'), err.message); }
+}
+
+/* ---------- Lançamentos (CRUD) ---------- */
+/* O serializer de lançamentos não devolve km/kWh, então calculamos aqui:
+   km / (capacidade da bateria em kWh × % de bateria / 100) */
+function eficLanc(l){
+  if(l[F.lanc.efic] != null) return +l[F.lanc.efic];
+  const v = veiculos.find(v => v.id == l[F.lanc.veiculo]);
+  const kwh = v ? (+v[F.veic.cap]) * (+l[F.lanc.bat]) / 100 : 0;
+  return kwh > 0 ? (+l[F.lanc.km]) / kwh : null;
+}
+function renderLancs(){
+  const rows = [...lancs].sort((a,b)=> String(b[F.lanc.data]||'').localeCompare(String(a[F.lanc.data]||'')));
+  $('lancBody').innerHTML = rows.length ? rows.map(l => `
+    <tr><td>${esc(l[F.lanc.data]||'–')}</td><td>${esc(veicNome(l[F.lanc.veiculo]))}</td>
+    <td>${num(l[F.lanc.km],1)}</td><td>${num(l[F.lanc.bat],1)}</td><td>${num(eficLanc(l))}</td>
+    <td class="actions"><button class="btn ghost sm" onclick="editLanc(${l.id})">Editar</button>
+    <button class="btn danger sm" onclick="delLanc(${l.id})">Excluir</button></td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">Nenhum lançamento ainda.</td></tr>';
+}
+$('lancForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const body = { [F.lanc.veiculo]:+$('lVeiculo').value, [F.lanc.km]:+$('lKm').value, [F.lanc.bat]:+$('lBat').value };
+  try{
+    if(editId) await api(EP.lancamentos+editId+'/', { method:'PUT', body: JSON.stringify(body) });
+    else await api(EP.lancamentos, { method:'POST', body: JSON.stringify(body) });
+    flash($('globalMsg'), editId ? 'Lançamento atualizado.' : 'Lançamento salvo.', 'ok');
+    resetLancForm(); loadAll();
+  }catch(err){ flash($('globalMsg'), err.message); }
+});
+function editLanc(id){
+  const l = lancs.find(x=>x.id===id); if(!l) return;
+  editId = id;
+  $('lVeiculo').value = l[F.lanc.veiculo]; $('lKm').value = l[F.lanc.km];
+  $('lBat').value = l[F.lanc.bat];
+  $('lancTitle').textContent = 'Editar lançamento #'+id;
+  $('lSubmit').textContent = 'Atualizar'; $('lCancel').classList.remove('hidden');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function resetLancForm(){
+  editId = null; $('lancForm').reset();
+  $('lancTitle').textContent = 'Novo lançamento de uso';
+  $('lSubmit').textContent = 'Salvar'; $('lCancel').classList.add('hidden');
+}
+$('lCancel').onclick = resetLancForm;
+async function delLanc(id){
+  if(!confirm('Excluir este lançamento?')) return;
+  try{ await api(EP.lancamentos+id+'/', {method:'DELETE'}); loadAll(); }catch(err){ flash($('globalMsg'), err.message); }
+}
+
+/* ---------- Estatísticas ---------- */
+function renderStats(){
+  $('stVeic').textContent = veiculos.length;
+  $('stLanc').textContent = lancs.length;
+  $('stKm').textContent = num(lancs.reduce((s,l)=>s+(+l[F.lanc.km]||0),0), 0);
+}
+
+/* ---------- Comparador (F03) ---------- */
+function drawChart(key, canvasId, labels, values){
+  if(charts[key]) charts[key].destroy();
+  charts[key] = new Chart($(canvasId), { type:'bar',
+    data:{ labels, datasets:[{ label:'km/kWh', data:values, backgroundColor:'#12a05c', borderRadius:6 }] },
+    options:{ plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true, title:{display:true,text:'km/kWh'}} } } });
+}
+async function loadComparador(homeOnly){
+  try{
+    const items = listOf(await api(EP.comparador));
+    const labels = items.map(i => i.nome || i.veiculo_nome || (typeof i.veiculo==='string' ? i.veiculo : null)
+      || [i[F.veic.marca], i[F.veic.modelo]].filter(Boolean).join(' ') || veicNome(i.veiculo || i.id));
+    const values = items.map(i => +(i[F.comp.efic] ?? i.eficiencia_media ?? i.media_km_por_kwh ?? 0));
+    drawChart('home','chartHome',labels,values);
+    if(values.length){ const m = values.indexOf(Math.max(...values)); $('stBest').textContent = `${labels[m]} (${num(values[m])})`; }
+    if(!homeOnly){
+      drawChart('comp','chartComp',labels,values);
+      $('compBody').innerHTML = items.length ? items.map((_,i)=>`<tr><td>${esc(labels[i])}</td><td>${num(values[i])}</td></tr>`).join('')
+        : '<tr><td colspan="2" class="empty">Sem dados para comparar.</td></tr>';
+    }
+  }catch(err){ flash($('globalMsg'), err.message); }
+}
+
+/* ---------- Init ---------- */
+function start(){
+  $('login').classList.add('hidden'); $('app').classList.remove('hidden'); loadAll();
+}
+const savedApi = localStorage.getItem('ev_api'); if(savedApi) $('apiBase').value = savedApi;
+if(tokens) start();
+</script>
+</body>
+</html>
