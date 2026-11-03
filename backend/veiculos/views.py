@@ -74,3 +74,70 @@ class ComparadorView(APIView):
             })
         serializer = EficienciaVeiculoSerializer(dados, many=True)
         return Response(serializer.data)
+    # ADICIONAR ao final de veiculos/views.py
+# (imports extras: from django.db import transaction
+#                  from rest_framework.decorators import action
+#                  from rest_framework.exceptions import ValidationError
+#                  from .models import VeiculoCatalogo, Compra
+#                  from .serializers import VeiculoCatalogoSerializer, CompraSerializer)
+from django.db import transaction
+from rest_framework import mixins, permissions, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
+
+from .models import Veiculo, VeiculoCatalogo, Compra
+from .serializers import VeiculoCatalogoSerializer, CompraSerializer
+
+
+class CatalogoViewSet(viewsets.ReadOnlyModelViewSet):
+    """Vitrine pública: GET /api/catalogo/ e /api/catalogo/<id>/ (cadastro pelo admin)."""
+    serializer_class = VeiculoCatalogoSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        return VeiculoCatalogo.objects.filter(ativo=True)
+
+
+class CompraViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
+                    mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """POST /api/compras/ {veiculo_catalogo, forma_pagamento}; GET lista as compras do usuário."""
+    serializer_class = CompraSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Compra.objects.filter(usuario=self.request.user)
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            # trava a linha para dois compradores não levarem a última unidade
+            item = VeiculoCatalogo.objects.select_for_update().get(
+                pk=serializer.validated_data['veiculo_catalogo'].pk)
+            if not item.ativo or item.estoque < 1:
+                raise ValidationError('Veículo indisponível no estoque.')
+            item.estoque -= 1
+            item.save(update_fields=['estoque'])
+            # o veículo comprado entra na garagem, pronto para monitorar e comparar
+            garagem = Veiculo.objects.create(
+                usuario=self.request.user, marca=item.marca, modelo=item.modelo,
+                ano=item.ano, capacidade_bateria_kwh=item.capacidade_bateria_kwh)
+            serializer.save(usuario=self.request.user, veiculo=garagem, preco_pago=item.preco)
+
+    @action(detail=True, methods=['post'])
+    def cancelar(self, request, pk=None):
+        with transaction.atomic():
+            compra = self.get_object()
+            if compra.status == 'CANCELADA':
+                raise ValidationError('Compra já cancelada.')
+            garagem = compra.veiculo
+            if garagem and garagem.lancamentos.exists():
+                raise ValidationError('Não é possível cancelar: o veículo já tem lançamentos.')
+            item = VeiculoCatalogo.objects.select_for_update().get(pk=compra.veiculo_catalogo_id)
+            item.estoque += 1
+            item.save(update_fields=['estoque'])
+            compra.status = 'CANCELADA'
+            compra.veiculo = None
+            compra.save()
+            if garagem:
+                garagem.delete()
+        return Response(self.get_serializer(compra).data)

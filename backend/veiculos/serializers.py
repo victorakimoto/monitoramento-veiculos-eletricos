@@ -49,3 +49,24 @@ class EficienciaVeiculoSerializer(serializers.Serializer):
     ano = serializers.IntegerField()
     km_total = serializers.DecimalField(max_digits=10, decimal_places=2)
     km_por_kwh = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
+    # ADICIONAR ao final de veiculos/serializers.py
+# (e incluir VeiculoCatalogo, Compra no "from .models import ...")
+from rest_framework import serializers
+from .models import VeiculoCatalogo, Compra
+
+
+class VeiculoCatalogoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VeiculoCatalogo
+        fields = ['id', 'marca', 'modelo', 'ano', 'capacidade_bateria_kwh',
+                  'preco', 'estoque', 'imagem_url']
+
+
+class CompraSerializer(serializers.ModelSerializer):
+    veiculo_catalogo_nome = serializers.CharField(source='veiculo_catalogo.__str__', read_only=True)
+
+    class Meta:
+        model = Compra
+        fields = ['id', 'veiculo_catalogo', 'veiculo_catalogo_nome', 'veiculo',
+                  'preco_pago', 'forma_pagamento', 'status', 'data_compra']
+        read_only_fields = ['id', 'veiculo', 'preco_pago', 'status', 'data_compra']

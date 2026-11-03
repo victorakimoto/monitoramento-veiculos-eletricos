@@ -1,0 +1,152 @@
+[
+ {
+  "model": "veiculos.veiculocatalogo",
+  "pk": 1,
+  "fields": {
+   "marca": "Chevrolet",
+   "modelo": "Bolt EV",
+   "ano": 2023,
+   "capacidade_bateria_kwh": "60",
+   "preco": "230000.00",
+   "estoque": 5,
+   "imagem_url": "",
+   "ativo": true,
+   "criado_em": "2026-11-03T12:00:00Z"
+  }
+ },
+ {
+  "model": "veiculos.veiculocatalogo",
+  "pk": 2,
+  "fields": {
+   "marca": "Nissan",
+   "modelo": "Leaf",
+   "ano": 2022,
+   "capacidade_bateria_kwh": "40",
+   "preco": "200000.00",
+   "estoque": 5,
+   "imagem_url": "",
+   "ativo": true,
+   "criado_em": "2026-11-03T12:00:00Z"
+  }
+ },
+ {
+  "model": "veiculos.veiculocatalogo",
+  "pk": 3,
+  "fields": {
+   "marca": "Volvo",
+   "modelo": "EX30",
+   "ano": 2025,
+   "capacidade_bateria_kwh": "70",
+   "preco": "270000.00",
+   "estoque": 5,
+   "imagem_url": "",
+   "ativo": true,
+   "criado_em": "2026-11-03T12:00:00Z"
+  }
+ },
+ {
+  "model": "veiculos.veiculocatalogo",
+  "pk": 4,
+  "fields": {
+   "marca": "BYD",
+   "modelo": "Dolphin Mini",
+   "ano": 2025,
+   "capacidade_bateria_kwh": "38",
+   "preco": "115000.00",
+   "estoque": 5,
+   "imagem_url": "",
+   "ativo": true,
+   "criado_em": "2026-11-03T12:00:00Z"
+  }
+ },
+ {
+  "model": "veiculos.veiculocatalogo",
+  "pk": 5,
+  "fields": {
+   "marca": "GWM",
+   "modelo": "Ora 03",
+   "ano": 2024,
+   "capacidade_bateria_kwh": "48",
+   "preco": "150000.00",
+   "estoque": 5,
+   "imagem_url": "",
+   "ativo": true,
+   "criado_em": "2026-11-03T12:00:00Z"
+  }
+ },
+ {
+  "model": "veiculos.veiculocatalogo",
+  "pk": 6,
+  "fields": {
+   "marca": "BYD",
+   "modelo": "Dolphin",
+   "ano": 2025,
+   "capacidade_bateria_kwh": "44.9",
+   "preco": "150000.00",
+   "estoque": 5,
+   "imagem_url": "",
+   "ativo": true,
+   "criado_em": "2026-11-03T12:00:00Z"
+  }
+ },
+ {
+  "model": "veiculos.veiculocatalogo",
+  "pk": 7,
+  "fields": {
+   "marca": "Renault",
+   "modelo": "Kwid E-Tech",
+   "ano": 2024,
+   "capacidade_bateria_kwh": "26.8",
+   "preco": "140000.00",
+   "estoque": 5,
+   "imagem_url": "",
+   "ativo": true,
+   "criado_em": "2026-11-03T12:00:00Z"
+  }
+ },
+ {
+  "model": "veiculos.veiculocatalogo",
+  "pk": 8,
+  "fields": {
+   "marca": "Kia",
+   "modelo": "EV5",
+   "ano": 2025,
+   "capacidade_bateria_kwh": "64.2",
+   "preco": "300000.00",
+   "estoque": 5,
+   "imagem_url": "",
+   "ativo": true,
+   "criado_em": "2026-11-03T12:00:00Z"
+  }
+ },
+ {
+  "model": "veiculos.veiculocatalogo",
+  "pk": 9,
+  "fields": {
+   "marca": "BMW",
+   "modelo": "iX xDrive50",
+   "ano": 2025,
+   "capacidade_bateria_kwh": "111.5",
+   "preco": "700000.00",
+   "estoque": 5,
+   "imagem_url": "",
+   "ativo": true,
+   "criado_em": "2026-11-03T12:00:00Z"
+  }
+ },
+ {
+  "model": "veiculos.veiculocatalogo",
+  "pk": 10,
+  "fields": {
+   "marca": "Zeekr",
+   "modelo": "X",
+   "ano": 2025,
+   "capacidade_bateria_kwh": "66",
+   "preco": "250000.00",
+   "estoque": 5,
+   "imagem_url": "",
+   "ativo": true,
+   "criado_em": "2026-11-03T12:00:00Z"
+  }
+ }
+]
