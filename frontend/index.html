@@ -42,6 +42,21 @@
   #login{max-width:380px;margin:80px auto}
   .hidden{display:none!important}
   .overflow{overflow-x:auto}
+  .cat-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+  .cat-card{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;background:#fff}
+  .cat-img{height:130px;background:#ecfdf3;display:flex;align-items:center;justify-content:center;font-size:42px}
+  .cat-img img{width:100%;height:100%;object-fit:cover}
+  .cat-body{padding:14px;display:flex;flex-direction:column;gap:4px;flex:1}
+  .cat-body b{font-size:16px}
+  .cat-body small{color:var(--muted)}
+  .cat-price{font-size:20px;font-weight:600;margin-top:6px}
+  .cat-body .btn{margin-top:auto}
+  .cat-body .btn:disabled{background:#d0d5dd;cursor:not-allowed}
+  .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px}
+  .tag.ok{background:#ecfdf3;color:var(--brand-d)}
+  .tag.bad{background:#fef3f2;color:var(--danger)}
+  dialog{border:0;border-radius:var(--radius);padding:22px;width:min(360px,92vw);box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  dialog::backdrop{background:rgba(16,24,40,.5)}
   .cfg{font-size:12px;color:var(--muted);margin-top:10px}
   .cfg input{width:260px;padding:4px 6px;font-size:12px}
 </style>
@@ -71,6 +86,7 @@
       <button data-tab="veiculos">Veículos</button>
       <button data-tab="lancamentos">Lançamentos</button>
       <button data-tab="comparador">Comparador</button>
+      <button data-tab="catalogo">Catálogo</button>
     </nav>
     <button class="btn ghost sm" id="logout" style="color:#fff;border-color:#475467">Sair</button>
   </header>
@@ -130,6 +146,37 @@
       </div>
     </section>
 
+    <!-- Catálogo / Concessionária virtual -->
+    <section id="tab-catalogo" class="hidden">
+      <div class="card">
+        <h2>Concessionária virtual</h2>
+        <p style="margin:0 0 14px;color:var(--muted);font-size:14px">Compra simulada: ao comprar, o veículo entra na sua garagem (aba Veículos) e passa a poder ser monitorado e comparado.</p>
+        <div id="catGrid" class="cat-grid"></div>
+      </div>
+      <div class="card overflow">
+        <h2>Minhas compras</h2>
+        <table>
+          <thead><tr><th>Data</th><th>Veículo</th><th>Pagamento</th><th>Preço pago</th><th>Status</th><th></th></tr></thead>
+          <tbody id="compraBody"></tbody>
+        </table>
+      </div>
+      <dialog id="buyDialog">
+        <form method="dialog" id="buyForm">
+          <h2 id="buyTitle" style="margin:0 0 6px;font-size:17px">Comprar</h2>
+          <p id="buyPrice" style="margin:0 0 14px;color:var(--muted)"></p>
+          <label>Forma de pagamento</label>
+          <select id="buyForma">
+            <option value="A_VISTA">À vista</option>
+            <option value="FINANCIADO">Financiado</option>
+          </select>
+          <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end">
+            <button type="button" class="btn ghost" id="buyCancel">Cancelar</button>
+            <button type="submit" class="btn" id="buyConfirm" value="ok">Confirmar compra</button>
+          </div>
+        </form>
+      </dialog>
+    </section>
+
     <!-- Comparador (F03) -->
     <section id="tab-comparador" class="hidden">
       <div class="card"><h2>Comparador de modelos — km/kWh</h2><canvas id="chartComp" height="110"></canvas></div>
@@ -144,7 +191,9 @@
 /* ============================================================
    CONFIG — ajuste aqui se os nomes dos campos da sua API forem diferentes
    ============================================================ */
-const EP = { login:'/api/login/', veiculos:'/api/veiculos/', lancamentos:'/api/lancamentos/', comparador:'/api/comparador/' };
+const EP = { login:'/api/login/', veiculos:'/api/veiculos/', lancamentos:'/api/lancamentos/', comparador:'/api/comparador/',
+             catalogo:'/api/catalogo/', compras:'/api/compras/' };
+let catalogo = [], compras = [], buyingId = null;
 const F = {
   veic:{ marca:'marca', modelo:'modelo', ano:'ano', cap:'capacidade_bateria_kwh' },
   lanc:{ veiculo:'veiculo', km:'quilometragem_rodada', bat:'nivel_bateria_percentual', data:'data_lancamento', efic:'km_por_kwh' },
@@ -197,7 +246,7 @@ $('logout').onclick = logout;
 /* ---------- Navegação ---------- */
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active', x===b));
-  ['visao','veiculos','lancamentos','comparador'].forEach(t => $('tab-'+t).classList.toggle('hidden', t!==b.dataset.tab));
+  ['visao','veiculos','lancamentos','comparador','catalogo'].forEach(t => $('tab-'+t).classList.toggle('hidden', t!==b.dataset.tab));
   if(b.dataset.tab==='comparador') loadComparador();
   if(b.dataset.tab==='visao') loadComparador(true);
 });
@@ -205,8 +254,10 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
 /* ---------- Carga de dados ---------- */
 async function loadAll(){
   try{
-    [veiculos, lancs] = await Promise.all([ api(EP.veiculos).then(listOf), api(EP.lancamentos).then(listOf) ]);
-    renderVeiculos(); renderLancs(); renderStats(); loadComparador(true);
+    [veiculos, lancs, catalogo, compras] = await Promise.all([
+      api(EP.veiculos).then(listOf), api(EP.lancamentos).then(listOf),
+      api(EP.catalogo).then(listOf).catch(()=>[]), api(EP.compras).then(listOf).catch(()=>[]) ]);
+    renderVeiculos(); renderLancs(); renderStats(); renderCatalogo(); renderCompras(); loadComparador(true);
   }catch(err){ flash($('globalMsg'), err.message); }
 }
 const veicNome = id => { const v = veiculos.find(v=>v.id==id); return v ? `${v[F.veic.marca]||''} ${v[F.veic.modelo]||''}`.trim() : '#'+id; };
@@ -234,12 +285,12 @@ async function delVeic(id){
 }
 
 /* ---------- Lançamentos (CRUD) ---------- */
-/* O serializer de lançamentos não devolve km/kWh, então calculamos aqui:
-   km / (capacidade da bateria em kWh × % de bateria / 100) */
+/* O serializer de lançamentos não devolve km/kWh, então calculamos aqui, igual ao backend:
+   consumo (kWh) = capacidade × (100 − % de bateria restante) / 100; km/kWh = km / consumo */
 function eficLanc(l){
   if(l[F.lanc.efic] != null) return +l[F.lanc.efic];
   const v = veiculos.find(v => v.id == l[F.lanc.veiculo]);
-  const kwh = v ? (+v[F.veic.cap]) * (+l[F.lanc.bat]) / 100 : 0;
+  const kwh = v ? (+v[F.veic.cap]) * (100 - (+l[F.lanc.bat])) / 100 : 0;
   return kwh > 0 ? (+l[F.lanc.km]) / kwh : null;
 }
 function renderLancs(){
@@ -279,6 +330,62 @@ $('lCancel').onclick = resetLancForm;
 async function delLanc(id){
   if(!confirm('Excluir este lançamento?')) return;
   try{ await api(EP.lancamentos+id+'/', {method:'DELETE'}); loadAll(); }catch(err){ flash($('globalMsg'), err.message); }
+}
+
+/* ---------- Catálogo / compras (concessionária virtual) ---------- */
+const brl = v => (v==null || isNaN(v)) ? '–' : Number(v).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+const FORMAS = { A_VISTA:'À vista', FINANCIADO:'Financiado' };
+
+function renderCatalogo(){
+  $('catGrid').innerHTML = catalogo.length ? catalogo.map(c => {
+    const img = /^https?:\/\//.test(c.imagem_url || '') ? `<img src="${esc(c.imagem_url)}" alt="" onerror="this.replaceWith('🚗')">` : '🚗';
+    const semEstoque = !(c.estoque > 0);
+    return `<div class="cat-card">
+      <div class="cat-img">${img}</div>
+      <div class="cat-body">
+        <b>${esc(c.marca)} ${esc(c.modelo)}</b>
+        <small>${esc(c.ano)} · Bateria ${num(c.capacidade_bateria_kwh,1)} kWh</small>
+        <small>${semEstoque ? 'Sem estoque' : c.estoque + ' em estoque'}</small>
+        <div class="cat-price">${brl(c.preco)}</div>
+        <button class="btn" ${semEstoque ? 'disabled' : ''} onclick="openBuy(${c.id})">${semEstoque ? 'Esgotado' : 'Comprar'}</button>
+      </div></div>`; }).join('')
+    : '<div class="empty">Nenhum veículo no catálogo.</div>';
+}
+function renderCompras(){
+  $('compraBody').innerHTML = compras.length ? compras.map(c => `
+    <tr><td>${esc((c.data_compra||'').slice(0,10).split('-').reverse().join('/'))}</td>
+    <td>${esc(c.veiculo_catalogo_nome)}</td><td>${esc(FORMAS[c.forma_pagamento] || c.forma_pagamento)}</td>
+    <td>${brl(c.preco_pago)}</td>
+    <td><span class="tag ${c.status==='CONFIRMADA'?'ok':'bad'}">${c.status==='CONFIRMADA'?'Confirmada':'Cancelada'}</span></td>
+    <td class="actions">${c.status==='CONFIRMADA' ? `<button class="btn danger sm" onclick="cancelCompra(${c.id})">Cancelar</button>` : ''}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">Você ainda não fez nenhuma compra.</td></tr>';
+}
+function openBuy(id){
+  const c = catalogo.find(x=>x.id===id); if(!c) return;
+  buyingId = id;
+  $('buyTitle').textContent = `Comprar ${c.marca} ${c.modelo}`;
+  $('buyPrice').textContent = `${c.ano} · ${brl(c.preco)} (valor simulado)`;
+  $('buyForma').value = 'A_VISTA';
+  $('buyDialog').showModal();
+}
+$('buyCancel').onclick = () => $('buyDialog').close();
+$('buyForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('buyConfirm').disabled = true;
+  try{
+    await api(EP.compras, { method:'POST', body: JSON.stringify({ veiculo_catalogo: buyingId, forma_pagamento: $('buyForma').value }) });
+    $('buyDialog').close();
+    flash($('globalMsg'), 'Compra confirmada! O veículo foi para a sua garagem (aba Veículos).', 'ok');
+    loadAll();
+  }catch(err){ $('buyDialog').close(); flash($('globalMsg'), err.message); }
+  finally{ $('buyConfirm').disabled = false; }
+});
+async function cancelCompra(id){
+  if(!confirm('Cancelar esta compra?')) return;
+  try{
+    await api(`${EP.compras}${id}/cancelar/`, { method:'POST' });
+    flash($('globalMsg'), 'Compra cancelada.', 'ok'); loadAll();
+  }catch(err){ flash($('globalMsg'), err.message); }
 }
 
 /* ---------- Estatísticas ---------- */
